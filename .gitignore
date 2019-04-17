@@ -1,0 +1,18 @@
+##  Ignore some temporary files
+##  build by vs2017
+
+
+#
+*.obj
+*.log
+*.idb
+*.pdb
+*.tlog
+*.exe
+*.ilk
+
+
+#
+*.vs
+
+*.vscode
