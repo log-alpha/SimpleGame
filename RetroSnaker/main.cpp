@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <time.h>
 #include <math.h>
+#include <string>
 
 float FPS = 60.0f;  // frame per second
 float interval = 1000.0f / FPS; // update interval
@@ -60,16 +61,122 @@ public:
         std::cout << "(" << m_snakerState.m_iPosx << ", " << 
         m_snakerState.m_iPosy << ")" << std::endl;
     }
+    void keyControl(KEY_EVENT_RECORD keyEvent) {
+        
+        switch(keyEvent.uChar.AsciiChar) {
+            case 'w':
+                m_snakerState.m_dir = SnakerDireCtion::UP;
+                break;
+            case 's':
+                m_snakerState.m_dir = SnakerDireCtion::DOWN;
+                break;
+            case 'a':
+                m_snakerState.m_dir = SnakerDireCtion::LEFT;
+                break;
+            case 'd':
+                m_snakerState.m_dir = SnakerDireCtion::RIGHT;
+                break;
+            default:
+                break;
+        }
+    }
 };
+
+Game oneGame;
+
+int initConsole() {
+    CHAR_INFO ch[80];
+    memset(ch, '-', sizeof(ch));
+    SMALL_RECT srctWriteRect;
+    srctWriteRect.Top = 0;
+    srctWriteRect.Left = 0;
+    srctWriteRect.Bottom = 0;
+    srctWriteRect.Right = 79;
+    COORD coordBufSize;
+    COORD coordBufCoord;
+    coordBufSize.Y = 1;
+    coordBufSize.X = 80;
+    coordBufCoord.X = 0;
+    coordBufCoord.Y = 0;
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    BOOL fSuccess;
+    HANDLE hNewScreenBuffer = CreateConsoleScreenBuffer( 
+       GENERIC_READ |           // read/write access 
+       GENERIC_WRITE, 
+       FILE_SHARE_READ | 
+       FILE_SHARE_WRITE,        // shared 
+       NULL,                    // default security attributes 
+       CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE 
+       NULL);
+    if (! SetConsoleActiveScreenBuffer(hNewScreenBuffer) ) 
+    {
+        printf("SetConsoleActiveScreenBuffer failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+
+    fSuccess = WriteConsoleOutput(
+        hNewScreenBuffer,
+        ch,
+        coordBufSize,
+        coordBufCoord,
+        &srctWriteRect);
+    srctWriteRect.Top++;
+    srctWriteRect.Bottom++;
+    if (! fSuccess) {
+        printf("ReadConsoleOutput failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+    return 0;
+}
+
+void ReadInput() {
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE); 
+    INPUT_RECORD irInBuf[128]; 
+    DWORD cNumRead;
+    if(! PeekConsoleInput(
+        hStdin,
+        irInBuf,
+        128,
+        &cNumRead)){
+            std::cout << "ReadConsoleInput error" << std::endl;
+        }
+    if (cNumRead) {
+        FlushConsoleInputBuffer(hStdin);
+    }
+    for (int i = 0; i < cNumRead; i++) 
+    {
+        switch(irInBuf[i].EventType) 
+        { 
+            case KEY_EVENT: // keyboard input 
+                //std::cout << irInBuf[i].Event.KeyEvent.uChar.AsciiChar << std::endl;
+                oneGame.keyControl(irInBuf[i].Event.KeyEvent);
+                //KeyEventProc(irInBuf[i].Event.KeyEvent); 
+                break;  
+            case MOUSE_EVENT: // mouse input 
+                //MouseEventProc(irInBuf[i].Event.MouseEvent); 
+                break;  
+            case WINDOW_BUFFER_SIZE_EVENT: // scrn buf. resizing 
+                //ResizeEventProc( irInBuf[i].Event.WindowBufferSizeEvent ); 
+                break;  
+            case FOCUS_EVENT:  // disregard focus events  
+            case MENU_EVENT:   // disregard menu events 
+                break;  
+            default: 
+                break; 
+        } 
+    }
+}
 
 int main(){
     int count = 0;
     std::cout << time(0) << std::endl;
     HWND hWnd = GetConsoleWindow();
     std::cout << hWnd << std::endl;
-    Game oneGame;
+    
     std::cout << "interval=" << interval << std::endl;
+    
     while(true){
+        ReadInput();
         Sleep(interval);
         //std::cout << count++ << std::endl;
         oneGame.elapse();
