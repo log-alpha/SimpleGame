@@ -36,21 +36,25 @@ public:
     }
     void tick(float time) {
         static int last_update = (int)floor(m_time);
-        m_time += time;
+        m_time += time * 5;
         if(m_time - last_update < 1.0f) return;
         last_update = (int)floor(m_time);
         switch(m_snakerState.m_dir) {
             case SnakerDireCtion::UP:
-                m_snakerState.m_iPosy++;
+                if(m_snakerState.m_iPosy<19)
+                    m_snakerState.m_iPosy++;
                 break;
             case SnakerDireCtion::DOWN:
-                m_snakerState.m_iPosy--;
+                if(m_snakerState.m_iPosy>0)
+                    m_snakerState.m_iPosy--;
                 break;
             case SnakerDireCtion::RIGHT:
-                m_snakerState.m_iPosx++;
+                if(m_snakerState.m_iPosx<19)
+                    m_snakerState.m_iPosx++;
                 break;
             case SnakerDireCtion::LEFT:
-                m_snakerState.m_iPosx--;
+                if(m_snakerState.m_iPosx>0)
+                    m_snakerState.m_iPosx--;
                 break;
             default:
                 break;
@@ -65,16 +69,24 @@ public:
         
         switch(keyEvent.uChar.AsciiChar) {
             case 'w':
-                m_snakerState.m_dir = SnakerDireCtion::UP;
+                if(m_snakerState.m_dir != SnakerDireCtion::DOWN) {
+                    m_snakerState.m_dir = SnakerDireCtion::UP;
+                }
                 break;
             case 's':
-                m_snakerState.m_dir = SnakerDireCtion::DOWN;
+                if(m_snakerState.m_dir != SnakerDireCtion::UP) {
+                    m_snakerState.m_dir = SnakerDireCtion::DOWN;
+                }
                 break;
             case 'a':
-                m_snakerState.m_dir = SnakerDireCtion::LEFT;
+                if(m_snakerState.m_dir != SnakerDireCtion::RIGHT) {
+                    m_snakerState.m_dir = SnakerDireCtion::LEFT;
+                }
                 break;
             case 'd':
-                m_snakerState.m_dir = SnakerDireCtion::RIGHT;
+                if(m_snakerState.m_dir != SnakerDireCtion::LEFT) {
+                    m_snakerState.m_dir = SnakerDireCtion::RIGHT;
+                }
                 break;
             default:
                 break;
@@ -85,6 +97,7 @@ public:
 Game oneGame;
 
 int initConsole() {
+    system("mode con cols=5 lines=5  ");
     CHAR_INFO ch[80];
     memset(ch, '-', sizeof(ch));
     SMALL_RECT srctWriteRect;
@@ -122,7 +135,7 @@ int initConsole() {
         &srctWriteRect);
     srctWriteRect.Top++;
     srctWriteRect.Bottom++;
-    if (! fSuccess) {
+    if (!fSuccess) {
         printf("ReadConsoleOutput failed - (%d)\n", GetLastError()); 
         return 1;
     }
@@ -148,23 +161,79 @@ void ReadInput() {
         switch(irInBuf[i].EventType) 
         { 
             case KEY_EVENT: // keyboard input 
-                //std::cout << irInBuf[i].Event.KeyEvent.uChar.AsciiChar << std::endl;
                 oneGame.keyControl(irInBuf[i].Event.KeyEvent);
-                //KeyEventProc(irInBuf[i].Event.KeyEvent); 
-                break;  
-            case MOUSE_EVENT: // mouse input 
-                //MouseEventProc(irInBuf[i].Event.MouseEvent); 
-                break;  
-            case WINDOW_BUFFER_SIZE_EVENT: // scrn buf. resizing 
-                //ResizeEventProc( irInBuf[i].Event.WindowBufferSizeEvent ); 
-                break;  
-            case FOCUS_EVENT:  // disregard focus events  
-            case MENU_EVENT:   // disregard menu events 
-                break;  
+                break;
             default: 
                 break; 
         } 
     }
+}
+
+HANDLE hNewScreenBuffer[2];
+
+// 40 x 40 size
+int initRender() {
+    SMALL_RECT srctWindow;
+    srctWindow.Top = 0;
+    srctWindow.Left = 0;
+    srctWindow.Bottom = 30;
+    srctWindow.Right = 30;
+    for(int i = 0;i < 2; ++i){
+        hNewScreenBuffer[i] = CreateConsoleScreenBuffer( 
+        GENERIC_READ |           // read/write access 
+        GENERIC_WRITE, 
+        FILE_SHARE_READ | 
+        FILE_SHARE_WRITE,        // shared 
+        NULL,                    // default security attributes 
+        CONSOLE_TEXTMODE_BUFFER, // must be TEXTMODE 
+        NULL);
+        SetConsoleWindowInfo(hNewScreenBuffer[i], TRUE, &srctWindow);
+        if (! SetConsoleActiveScreenBuffer(hNewScreenBuffer[i]) ) 
+        {
+            printf("SetConsoleActiveScreenBuffer failed - (%d)\n", GetLastError()); 
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int RenderConsole(Game oneGame) {
+    static int bufferCount = 0;
+    CHAR_INFO buf[20 * 20];
+    memset(buf, '-', sizeof(buf));
+    SMALL_RECT srctWriteRect;
+    buf[oneGame.m_snakerState.m_iPosx  + (19 - oneGame.m_snakerState.m_iPosy) * 20].Char.AsciiChar = CHAR("-");
+    srctWriteRect.Top = 0;
+    srctWriteRect.Left = 0;
+    srctWriteRect.Bottom = 19;
+    srctWriteRect.Right = 19;
+    COORD coordBufSize, coordBufCoord;
+    coordBufSize.X = 20;
+    coordBufSize.Y = 20;
+    coordBufCoord.X = 0;
+    coordBufCoord.Y = 0;
+    bool fSuccess = false;
+    DWORD iCharWritten;
+    fSuccess = WriteConsoleOutput(
+        hNewScreenBuffer[bufferCount],
+        buf,
+        coordBufSize,
+        coordBufCoord,
+        &srctWriteRect);
+    if (!fSuccess) {
+        printf("WriteConsoleOutput failed - (%d)\n", GetLastError()); 
+        return 1;
+    }
+
+    if (! SetConsoleActiveScreenBuffer(hNewScreenBuffer[bufferCount]) ) 
+    {
+       printf("SetConsoleActiveScreenBuffer failed - (%d)\n", GetLastError()); 
+       return 1;
+    }
+
+    bufferCount++;
+    bufferCount%=2;
+    return 0;
 }
 
 int main(){
@@ -174,10 +243,11 @@ int main(){
     std::cout << hWnd << std::endl;
     
     std::cout << "interval=" << interval << std::endl;
-    
+    initRender();
     while(true){
-        ReadInput();
         Sleep(interval);
+        ReadInput();
+        RenderConsole(oneGame);
         //std::cout << count++ << std::endl;
         oneGame.elapse();
     }
